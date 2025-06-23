@@ -74,11 +74,6 @@ jobs:
                 }
 
                 const pr = prs[0];
-                console.log(`PR number: ${pr.number}`);
-                console.log(`PR title: ${pr.title}`);
-                console.log(`PR state: ${pr.state}`);
-                console.log(`PR URL: ${pr.html_url}`);
-
                 labels = pr.labels;
               }
               catch (e) {
@@ -91,106 +86,123 @@ jobs:
             console.log('Found the label?', labelFound);
             core.setOutput('run-e2e', labelFound);
 
+  risk-check:
+    name: Check Change Risk
+    runs-on: buildjet-2vcpu-ubuntu-2204
+    needs: [changes]
+    if: ${{ needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set execute permission for script
+        run: chmod +x .github/scripts/check-low-risk-changes.sh
+
+      - name: Run low-risk check script
+        run: ./.github/scripts/check-low-risk-changes.sh
+
   deps:
     name: Install dependencies
-    needs: [changes, check-label]
+    needs: [changes, check-label, risk-check]
     if: ${{ needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/yarn-install.yml
 
   type-check:
     name: Type check
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/check-types.yml
     secrets: inherit
 
   lint:
     name: Linters
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/lint.yml
     secrets: inherit
 
   unit-test:
     name: Tests
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/unit-tests.yml
     secrets: inherit
 
   build-api-v1:
     name: Production builds
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/api-v1-production-build.yml
     secrets: inherit
 
   build-api-v2:
     name: Production builds
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/api-v2-production-build.yml
     secrets: inherit
 
   build-atoms:
     name: Production builds
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/atoms-production-build.yml
     secrets: inherit
 
   build-docs:
     name: Production builds
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/docs-build.yml
     secrets: inherit
 
   build:
     name: Production builds
-    needs: [changes, check-label, deps]
+    needs: [changes, check-label, deps, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/production-build-without-database.yml
     secrets: inherit
 
   integration-test:
     name: Tests
-    needs: [changes, check-label, build, build-api-v1, build-api-v2]
+    needs: [changes, check-label, build, build-api-v1, build-api-v2, risk-check]
     if: ${{ needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/integration-tests.yml
     secrets: inherit
 
   e2e:
     name: Tests
-    needs: [changes, check-label, build, build-api-v1, build-api-v2]
+    needs: [changes, check-label, build, build-api-v1, build-api-v2, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/e2e.yml
     secrets: inherit
 
   e2e-api-v2:
     name: Tests
-    needs: [changes, check-label, build, build-api-v1, build-api-v2]
+    needs: [changes, check-label, build, build-api-v1, build-api-v2, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/e2e-api-v2.yml
     secrets: inherit
 
   e2e-app-store:
     name: Tests
-    needs: [changes, check-label, build, build-api-v1, build-api-v2]
+    needs: [changes, check-label, build, build-api-v1, build-api-v2, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/e2e-app-store.yml
     secrets: inherit
 
   e2e-embed:
     name: Tests
-    needs: [changes, check-label, build, build-api-v1, build-api-v2]
+    needs: [changes, check-label, build, build-api-v1, build-api-v2, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/e2e-embed.yml
     secrets: inherit
 
   e2e-embed-react:
     name: Tests
-    needs: [changes, check-label, build, build-api-v1, build-api-v2]
+    needs: [changes, check-label, build, build-api-v1, build-api-v2, risk-check]
     if: ${{ needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
     uses: ./.github/workflows/e2e-embed-react.yml
     secrets: inherit
@@ -204,7 +216,7 @@ jobs:
   merge-reports:
     name: Merge reports
     if: ${{ !cancelled() && needs.check-label.outputs.run-e2e == 'true' && needs.changes.outputs.has-files-requiring-all-checks == 'true' }}
-    needs: [changes, check-label, e2e, e2e-embed, e2e-embed-react, e2e-app-store]
+    needs: [changes, check-label, e2e, e2e-embed, e2e-embed-react, e2e-app-store, risk-check]
     uses: ./.github/workflows/merge-reports.yml
     secrets: inherit
 
@@ -215,7 +227,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    needs: [changes, check-label, merge-reports]
+    needs: [changes, check-label, merge-reports, risk-check]
     uses: ./.github/workflows/publish-report.yml
     secrets: inherit
 
@@ -226,7 +238,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    needs: [changes, check-label, publish-report]
+    needs: [changes, check-label, publish-report, risk-check]
     uses: ./.github/workflows/cleanup-report.yml
     secrets: inherit
 
@@ -249,6 +261,7 @@ jobs:
         e2e-embed,
         e2e-embed-react,
         e2e-app-store,
+        risk-check,
       ]
     if: always()
     runs-on: buildjet-2vcpu-ubuntu-2204
